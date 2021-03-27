@@ -40,9 +40,7 @@ echo "ams-frontendのセットアップ"
 cd ams-frontend
 echo "現在のディレクトリ `pwd`"
 cp .env_sample .env # 環境変数を設定
-npm run build # ビルド
-npm start # スタート
-# TODO ここpm2化する？
+pm2 start ecosystem.config.js
 echo "ams-frontendのセットアップ終わり"
 
 echo "ams-backendのセットアップ"
@@ -78,12 +76,12 @@ mysql -uroot -p${ROOTPASS} --verbose -e "GRANT DELETE, INSERT, SELECT, UPDATE ON
 mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_access_logs.sql # 入退室ログのテーブルを作成
 mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_in_room_users.sql # 入室中のテーブルを作成
 
-cp config.ts.sample config.ts # 設定ファイルを作成
+cp config.yml.sample config.yml # 設定ファイルを作成
 echo "設定ファイルを開きます。設定を書いてください"
 echo "Enterを押して続行"
 read Wait
-nano config.ts # 設定ファイルを編集 portは3000
-#pm2 start ecosystem.config.js # pm2プロセススタート
+nano config.yml # 設定ファイルを編集
+pm2 start ecosystem.config.js # pm2プロセススタート
 echo "ams-backendのセットアップ終わり"
 
 echo "rdr-bridgeのセットアップ"
