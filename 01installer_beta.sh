@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 途中手動でやらなきゃいけない部分アリ
-# これを実行するユーザーは(pi)はsudoが使えるとする
+# これを実行するユーザー(pi)はsudoが使えるとする
 echo "[Script begin] `date +%T`"
 echo "(始める前に)"
 echo "1. スピーカーを接続しておく。3.5mmプラグだけでなくUSB(電源用)も忘れずに接続しておく。"
@@ -26,14 +26,6 @@ nvm install-latest-npm
 echo "pm2のインストール"
 npm install -g pm2
 
-echo "MariaDBのインストール"
-sudo apt update # いつもの
-sudo apt install -y mariadb-server # インストール
-echo "MariaDBの初期設定"
-echo "rootのパスワードを設定したら後はデフォルトのままでEnterで"
-sudo mysql_secure_installation
-sudo systemctl restart mysql # サービスを再起動
-
 # 作業ディレクトリに移動
 mkdir -p ~/ams-project
 cd ~/ams-project
@@ -57,8 +49,17 @@ echo "ams-backendのセットアップ"
 cd ../ams-backend
 echo "現在のディレクトリ `pwd`"
 
-# 先ほど作成したMariaDBのrootユーザーのパスワードを入れる
-echo "先ほど作成したMariaDBのrootユーザーのパスワードを入れてください"
+echo "MariaDBのインストール"
+sudo apt update # いつもの
+sudo apt install -y mariadb-server # インストール
+echo "MariaDBの初期設定"
+echo "rootのパスワードを設定したら後はデフォルトのままでEnterで"
+sudo mysql_secure_installation
+echo "MariaDBサーバーを再起動しています"
+sudo systemctl restart mysql # サービスを再起動
+
+# 上で作成したMariaDBのrootユーザーのパスワードを入れる
+echo "いま作成したMariaDBのrootユーザーのパスワードを入れてください"
 echo -n "Enter password: "
 read ROOTPASS
 DBNAME=accessdb # 本番用データベースの名称
