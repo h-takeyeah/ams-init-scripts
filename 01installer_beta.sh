@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 途中手動でやらなきゃいけない部分アリ
-# これを実行するユーザーは(pi)はsudoが使えるとする
+# これを実行するユーザー(pi)はsudoが使えるとする
 echo "[Script begin] `date +%T`"
 echo "(始める前に)"
 echo "1. スピーカーを接続しておく。3.5mmプラグだけでなくUSB(電源用)も忘れずに接続しておく。"
@@ -26,14 +26,6 @@ nvm install-latest-npm
 echo "pm2のインストール"
 npm install -g pm2
 
-echo "MariaDBのインストール"
-sudo apt update # いつもの
-sudo apt install -y mariadb-server # インストール
-echo "MariaDBの初期設定"
-echo "rootのパスワードを設定したら後はデフォルトのままでEnterで"
-sudo mysql_secure_installation
-sudo systemctl restart mysql # サービスを再起動
-
 # 作業ディレクトリに移動
 mkdir -p ~/ams-project
 cd ~/ams-project
@@ -48,17 +40,24 @@ echo "ams-frontendのセットアップ"
 cd ams-frontend
 echo "現在のディレクトリ `pwd`"
 cp .env_sample .env # 環境変数を設定
-npm run build # ビルド
-npm start # スタート
-# TODO ここpm2化する？
+pm2 start ecosystem.config.js
 echo "ams-frontendのセットアップ終わり"
 
 echo "ams-backendのセットアップ"
 cd ../ams-backend
 echo "現在のディレクトリ `pwd`"
 
-# 先ほど作成したMariaDBのrootユーザーのパスワードを入れる
-echo "先ほど作成したMariaDBのrootユーザーのパスワードを入れてください"
+echo "MariaDBのインストール"
+sudo apt update # いつもの
+sudo apt install -y mariadb-server # インストール
+echo "MariaDBの初期設定"
+echo "rootのパスワードを設定したら後はデフォルトのままでEnterで"
+sudo mysql_secure_installation
+echo "MariaDBサーバーを再起動しています"
+sudo systemctl restart mysql # サービスを再起動
+
+# 上で作成したMariaDBのrootユーザーのパスワードを入れる
+echo "いま作成したMariaDBのrootユーザーのパスワードを入れてください"
 echo -n "Enter password: "
 read ROOTPASS
 DBNAME=accessdb # 本番用データベースの名称
@@ -70,24 +69,19 @@ read NORMALPASS
 echo "password for '${NORMALUSER}': ${NORMALPASS}"
 echo "OK"
 
-# unix_socketプラグインをオフにする
-sudo mysql -uroot -p${ROOTPASS} --verbose -e "update mysql.user set plugin='' where user='root'"
-echo "MariaDBを再起動しています"
-sudo systemctl restart mysql # サービスを再起動
-
 echo "データベース、ユーザー、テーブルの作成などを実行しています"
 mysql -uroot -p${ROOTPASS} --verbose -e "CREATE DATABASE IF NOT EXISTS ${DBNAME}" # データベースを作成
 mysql -uroot -p${ROOTPASS} --verbose -e "CREATE USER IF NOT EXISTS ${NORMALUSER}@'localhost' IDENTIFIED BY '${NORMALPASS}'" # 一般ユーザーを作成
-mysql -uroot -p${ROOTPASS} --verbose -e "GRANT ALL ON ${DBNAME}.* TO ${NORMALUSER}@'localhost'" # 一般ユーザーに権限を付与
+mysql -uroot -p${ROOTPASS} --verbose -e "GRANT DELETE, INSERT, SELECT, UPDATE ON ${DBNAME}.* TO ${NORMALUSER}@'localhost'" # 一般ユーザーに権限を付与
 mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_access_logs.sql # 入退室ログのテーブルを作成
 mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_in_room_users.sql # 入室中のテーブルを作成
 
-cp config.ts.sample config.ts # 設定ファイルを作成
+cp config.yml.sample config.yml # 設定ファイルを作成
 echo "設定ファイルを開きます。設定を書いてください"
 echo "Enterを押して続行"
 read Wait
-nano config.ts # 設定ファイルを編集 portは3000
-#pm2 start ecosystem.config.js # pm2プロセススタート
+nano config.yml # 設定ファイルを編集
+pm2 start ecosystem.config.js # pm2プロセススタート
 echo "ams-backendのセットアップ終わり"
 
 echo "rdr-bridgeのセットアップ"
