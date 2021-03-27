@@ -71,11 +71,6 @@ read NORMALPASS
 echo "password for '${NORMALUSER}': ${NORMALPASS}"
 echo "OK"
 
-# unix_socketプラグインをオフにする
-sudo mysql -uroot -p${ROOTPASS} --verbose -e "update mysql.user set plugin='' where user='root'"
-echo "MariaDBを再起動しています"
-sudo systemctl restart mysql # サービスを再起動
-
 echo "データベース、ユーザー、テーブルの作成などを実行しています"
 mysql -uroot -p${ROOTPASS} --verbose -e "CREATE DATABASE IF NOT EXISTS ${DBNAME}" # データベースを作成
 mysql -uroot -p${ROOTPASS} --verbose -e "CREATE USER IF NOT EXISTS ${NORMALUSER}@'localhost' IDENTIFIED BY '${NORMALPASS}'" # 一般ユーザーを作成
