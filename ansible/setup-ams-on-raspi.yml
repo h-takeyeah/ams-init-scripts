@@ -23,6 +23,7 @@
     - name: Get ansble_user home directory
       ansible.builtin.shell:
         cmd: "getent passwd {{ ansible_ssh_user }} | cut -d: -f6"
+      check_mode: no # --checkをつけて実行した時もこのタスクはスキップせずに実行する
       register: ansible_home_result
     - name: Set the fact for the other scripts to use
       set_fact: "pi_home={{ ansible_home_result.stdout }}"
