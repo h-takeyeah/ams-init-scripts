@@ -13,8 +13,9 @@
 
 ```sh
 # python3 --vesion >= 3.3
-python3 venv env
+python3 -m venv env
 source env/bin/activate
+pip install wheel
 pip install ansible
 ```
 
