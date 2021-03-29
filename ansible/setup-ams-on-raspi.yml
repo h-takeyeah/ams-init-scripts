@@ -15,8 +15,8 @@
     - name: normal_pass
       prompt: What is password for normal user?
 
-    - name: host_ip
-      prompt: What is pi's ip address(ipv4)?
+    #- name: host_ip
+    #  prompt: What is pi's ip address(ipv4)?
   pre_tasks:
     # become: で(unix)rootになったときに$HOMEが/rootになってしまって辛いので
     # piユーザーの$HOMEを"pi_home"に保存しておく
@@ -53,7 +53,7 @@
     # Node.js(Fermium)のインストール
     - name: Install Node.js lts version via nvm
       ansible.builtin.shell:
-        cmd: bash -lc "nvm install --lts=Fermium"
+        cmd: . $HOME/.nvm/nvm.sh && nvm install --lts=Fermium
         chdir: $HOME/
       register: resnode
 
