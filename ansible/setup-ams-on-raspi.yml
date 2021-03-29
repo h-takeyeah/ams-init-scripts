@@ -1,0 +1,185 @@
+---
+- name: Setup the system
+  hosts: raspberrypi # Defined in inventory.yml
+  vars:
+    # clone対象のリポジトリの配列
+    repos:
+      - { repo: 'https://github.com/su-its/ams-frontend.git', version: 'develop', dest: 'ams-frontend' }
+      - { repo: 'https://github.com/su-its/ams-backend.git', version: 'develop', dest: 'ams-backend' }
+      - { repo: 'https://github.com/su-its/rdr-bridge.git', version: 'main', dest: 'rdr-bridge' }
+  vars_prompt:
+    # DBのrootではないユーザーとして"normal@localhost"を作成するので
+    # それ用のパスワードをプロンプトで設定させる
+    - name: normal_pass
+      prompt: What is password for normal user?
+
+    - name: host_ip
+      prompt: What is pi's ip address(ipv4)?
+  pre_tasks:
+    # become: で(unix)rootになったときに$HOMEが/rootになってしまって辛いので
+    # piユーザーの$HOMEを"pi_home"に保存しておく
+    - name: Get ansble_user home directory
+      ansible.builtin.shell:
+        cmd: "getent passwd {{ ansible_ssh_user }} | cut -d: -f6"
+      register: ansible_home_result
+    - name: Set the fact for the other scripts to use
+      set_fact: "pi_home={{ ansible_home_result.stdout }}"
+  tasks:
+    # nvmインストール用スクリプトのダウンロード
+    - name: Download install script of nvm
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/nvm-sh/nvm/v0.37.2/install.sh
+        dest: $HOME/
+        mode: 0755
+
+    # .nvm/ディレクトリの削除(無かったら何も起きない)
+    - name: Delete .nvm/ dir (if exists) before create
+      ansible.builtin.file:
+        path: $HOME/.nvm/
+        state: absent
+
+    # nvmインストール用スクリプトの実行
+    - name: Install nvm using the install script
+      ansible.builtin.shell:
+        cmd: ./install.sh
+        chdir: $HOME/
+      register: ressh
+
+    # インストール結果の確認
+    - debug: var=ressh
+
+    # Node.js(Fermium)のインストール
+    - name: Install Node.js lts version via nvm
+      ansible.builtin.shell:
+        cmd: bash -lc "nvm install --lts=Fermium"
+        chdir: $HOME/
+      register: resnode
+
+    # インストール結果の確認
+    - debug: var=resnode
+
+    # npmを最新版にアップデート(多分ここかその前で失敗する)
+    - name: Update npm
+      ansible.builtin.shell:
+        #cmd: . $HOME/.nvm/nvm.sh && npm i -g npm@7.6.3
+        cmd: . $HOME/.nvm/nvm.sh && nvm install-latest-npm
+
+    # pm2のインストール
+    - name: Install pm2 globally
+      ansible.builtin.shell:
+        cmd: . $HOME/.nvm/nvm.sh && npm i -g pm2@4.5.5
+    - name: Activate pm2
+      ansible.builtin.shell:
+        cmd: . $HOME/.nvm/nvm.sh && pm2
+
+    # MariaDBのインストール(apt経由)
+    - name: Install MariaDB
+      become: yes
+      apt:
+        name:
+          mariadb-server
+        update_cache: yes # do apt update before install
+
+    # 必要なリポジトリの取得
+    - name: Clone repos from GitHub
+      ansible.builtin.git:
+        repo: "{{ item.repo }}"
+        version: "{{ item.version }}"
+        clone: yes
+        dest: "$HOME/ams-project/{{ item.dest }}/"
+      loop: "{{ repos }}"
+
+    # npm install
+    - name: Do npm install
+      ansible.builtin.shell:
+        cmd: . $HOME/.nvm/nvm.sh && npm i
+        chdir: "$HOME/ams-project/{{ item }}/"
+      loop:
+        - 'ams-frontend'
+        - 'ams-backend'
+
+    # unix_socketをオフにする
+    - name: Remove unix_socket plugin from root's plugins
+      become: yes
+      community.mysql.mysql_query:
+        login_db: mysql
+        login_host: "{{ host_ip }}"
+        login_port: 3306
+        query: "update mysql.user set plugin='' where user='root'"
+
+    # データベースを作成
+    - name: Create database
+      community.mysql.mysql_db:
+        name: Entering_And_Leaving_The_Room
+
+    # テーブルを作成(まだrootのパスワードを設定していないので
+    # init_migrate_db内の-p(using password=yes) のせいで失敗する
+    - name: Import database
+      ansible.builtin.shell:
+        cmd: schema/init_migrate_db.sh
+        chdir: $HOME/ams-project/ams-backend/
+
+    # 一般ユーザー(rootではないユーザー)を"normal@localhost"として作成
+    - name: Create normal user
+      community.mysql.mysql_user:
+        name: normal
+        host: localhost
+        password: "{{ normal_pass }}"
+
+    # .envの生成
+    - name: (frontend) cp .env_sample .env
+      ansible.builtin.shell:
+        cmd: cp .env_sample .env
+        chdir: $HOME/ams-project/ams-frontend/
+        creates: .env # 作成対象のファイル これがあるとすでに存在した場合に上書きされるのを防げる
+    # .env中の"localhost"を実際のipに置き換える nuxtのプロキシ使うなら不要
+    #- name: (frontend) edit .env
+    #  ansible.builtin.shell:
+    #    cmd: sed -e "s/localhost/{{ host_ip }}/"
+    #    chdir: $HOME/ams-project/ams-frontend/
+    #    creates: .env
+
+    # pipライブラリのインストール
+    - name: (bridge) Install pip libraries
+      ansible.builtin.pip:
+        executable: pip3
+        requirements: requirements.txt
+        chdir: $HOME/ams-project/rdr-bridge/
+
+    # nfc関連のセットアップの下準備(実行するコマンドの抽出)
+    - name: (bridge) Setup nfc (prepare)
+      ansible.builtin.shell:
+        cmd: python3 -m nfc 2>&1 | awk '/^\s+sudo/ {print $0}'
+      register: nfc_result
+
+    # nfc関連のセットアップ実行(抽出したコマンドを実行)
+    - name: (bridge) Setup nfc
+      become: yes
+      ansible.builtin.shell:
+        cmd: "{{ nfc_result.stdout }}"
+      when: nfc_result is defined
+
+    # pm2 start ecosystem.config.js
+    - name: Do pm2 start
+      ansible.builtin.shell:
+        cmd: . $HOME/.nvm/nvm.sh && pm2 start ecosystem.config.js
+        chdir: "$HOME/ams-project/{{ item.dest }}/"
+      loop: "{{ repos }}"
+
+    # pm2 save
+    - name: Do pm2 save
+      ansible.builtin.shell:
+        cmd: . $HOME/.nvm/nvm.sh && pm2 save
+
+    # pm2 startupの下準備(実行するコマンドの抽出)
+    - name: Do pm2 startup (prepare)
+      ansible.builtin.shell:
+        cmd: . $HOME/.nvm/nvm.sh && pm2 startup 2>&1 | awk '/^sudo/ {print $0}'
+      register: pm2_result
+
+    # pm2 startup実行(抽出したコマンドの実行)
+    - name: Do pm2
+      become: yes
+      ansible.builtin.shell:
+        cmd: "{{ pm2_result.stdout }}"
+      when: pm2_result is defined
