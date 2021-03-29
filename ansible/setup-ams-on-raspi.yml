@@ -2,6 +2,8 @@
 - name: Setup the system
   hosts: raspberrypi # Defined in inventory.yml
   vars:
+    # 作成するデータベース
+    db_name: accessdb
     # clone対象のリポジトリの配列
     repos:
       - { repo: 'https://github.com/su-its/ams-frontend.git', version: 'develop', dest: 'ams-frontend' }
@@ -72,14 +74,6 @@
       ansible.builtin.shell:
         cmd: . $HOME/.nvm/nvm.sh && pm2
 
-    # MariaDBのインストール(apt経由)
-    - name: Install MariaDB
-      become: yes
-      apt:
-        name:
-          mariadb-server
-        update_cache: yes # do apt update before install
-
     # 必要なリポジトリの取得
     - name: Clone repos from GitHub
       ansible.builtin.git:
@@ -98,33 +92,52 @@
         - 'ams-frontend'
         - 'ams-backend'
 
-    # unix_socketをオフにする
-    - name: Remove unix_socket plugin from root's plugins
+    # MariaDBのインストール(apt経由)
+    - name: Install MariaDB
       become: yes
-      community.mysql.mysql_query:
-        login_db: mysql
-        login_host: "{{ host_ip }}"
-        login_port: 3306
-        query: "update mysql.user set plugin='' where user='root'"
+      apt:
+        name:
+          mariadb-server
+        update_cache: yes # do apt update before install
 
     # データベースを作成
     - name: Create database
+      become: yes
       community.mysql.mysql_db:
-        name: Entering_And_Leaving_The_Room
+        login_host: localhost
+        login_password: '' # MariaDB rootのパスワードは設定してないので空欄でOK
+        name: "{{ db_name }}"
+        state: present
 
-    # テーブルを作成(まだrootのパスワードを設定していないので
-    # init_migrate_db内の-p(using password=yes) のせいで失敗する
-    - name: Import database
-      ansible.builtin.shell:
-        cmd: schema/init_migrate_db.sh
-        chdir: $HOME/ams-project/ams-backend/
+    # スキーマ定義ファイルを探す
+    - name: Find table specifications
+      ansible.builtin.find:
+        file_type: file
+        pathes: $HOME/ams-project/ams-backend/schema
+        patterns: "create_table*.sql"
+        recurse: no
+      register: schemas
+
+    # テーブルを作成
+    - name: Create tables
+      become: yes
+      community.mysql.mysql_db:
+        login_host: localhost
+        login_password: ''
+        name: "{{ db_name }}"
+        state: import
+        target: "{{ item.path }}"
+      loop: "{{ schemas }}"
 
     # 一般ユーザー(rootではないユーザー)を"normal@localhost"として作成
     - name: Create normal user
+      become: yes
       community.mysql.mysql_user:
         name: normal
         host: localhost
         password: "{{ normal_pass }}"
+        priv: 'accessdb.*:DELETE,INSERT,SELECT,UPDATE' # 権限はこの4つだけ与える
+        state: present
 
     # .envの生成
     - name: (frontend) cp .env_sample .env
@@ -132,6 +145,7 @@
         cmd: cp .env_sample .env
         chdir: $HOME/ams-project/ams-frontend/
         creates: .env # 作成対象のファイル これがあるとすでに存在した場合に上書きされるのを防げる
+
     # .env中の"localhost"を実際のipに置き換える nuxtのプロキシ使うなら不要
     #- name: (frontend) edit .env
     #  ansible.builtin.shell:
