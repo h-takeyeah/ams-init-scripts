@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 
 # 途中手動でやらなきゃいけない部分アリ
 # これを実行するユーザー(pi)はsudoが使えるとする
@@ -106,4 +106,3 @@ echo "pm2プロセスの自動起動設定終わり"
 
 echo "sudo reboot で再起動して動作チェックして終わり"
 echo "[Script finished] `date +%T`"
-

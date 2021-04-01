@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 
 echo "[Script begin] `date +%T`"
 
