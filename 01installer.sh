@@ -23,10 +23,6 @@ read Wait
 # NVM_DIRは.bashrcでexport済みとする
 . $HOME/.bashrc
 . $NVM_DIR/nvm.sh
-echo "nodeのインストール"
-nvm install --lts=Fermium --latest-npm
-echo "npmのアップデート"
-nvm install-latest-npm
 echo "pm2のインストール"
 npm install -g pm2
 
