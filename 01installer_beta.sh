@@ -20,7 +20,9 @@ echo "Enterを押して続行"
 read Wait
 
 # nvm.shなど読み込み
+# NVM_DIRは.bashrcでexport済みとする
 . $HOME/.bashrc
+. $NVM_DIR/nvm.sh
 echo "nodeのインストール"
 nvm install --lts=Fermium
 echo "npmのアップデート"
