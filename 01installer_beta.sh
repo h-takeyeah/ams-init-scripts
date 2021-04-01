@@ -19,6 +19,8 @@ echo "4. [HDMI: オフ]に設定してOKをクリック"
 echo "Enterを押して続行"
 read Wait
 
+# nvm.shなど読み込み
+. $HOME/.bashrc
 echo "nodeのインストール"
 nvm install --lts=Fermium
 echo "npmのアップデート"
@@ -27,8 +29,8 @@ echo "pm2のインストール"
 npm install -g pm2
 
 # 作業ディレクトリに移動
-mkdir -p ~/ams-project
-cd ~/ams-project
+mkdir -p $HOME/ams-project
+cd $HOME/ams-project
 echo "現在のディレクトリ `pwd`"
 
 echo "ソースコードを持ってくる"
@@ -37,14 +39,14 @@ git clone --branch develop https://github.com/su-its/ams-backend.git
 git clone --branch main https://github.com/su-its/rdr-bridge.git
 
 echo "ams-frontendのセットアップ"
-cd ams-frontend
+cd $HOME/ams-project/ams-frontend
 echo "現在のディレクトリ `pwd`"
 cp .env_sample .env # 環境変数を設定
 pm2 start ecosystem.config.js
 echo "ams-frontendのセットアップ終わり"
 
 echo "ams-backendのセットアップ"
-cd ../ams-backend
+cd $HOME/ams-project/ams-backend
 echo "現在のディレクトリ `pwd`"
 
 echo "MariaDBのインストール"
@@ -70,11 +72,23 @@ echo "password for '${NORMALUSER}': ${NORMALPASS}"
 echo "OK"
 
 echo "データベース、ユーザー、テーブルの作成などを実行しています"
-mysql -uroot -p${ROOTPASS} --verbose -e "CREATE DATABASE IF NOT EXISTS ${DBNAME}" # データベースを作成
-mysql -uroot -p${ROOTPASS} --verbose -e "CREATE USER IF NOT EXISTS ${NORMALUSER}@'localhost' IDENTIFIED BY '${NORMALPASS}'" # 一般ユーザーを作成
-mysql -uroot -p${ROOTPASS} --verbose -e "GRANT DELETE, INSERT, SELECT, UPDATE ON ${DBNAME}.* TO ${NORMALUSER}@'localhost'" # 一般ユーザーに権限を付与
-mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_access_logs.sql # 入退室ログのテーブルを作成
-mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_in_room_users.sql # 入室中のテーブルを作成
+
+# ROOTPASSを設定しなかった場合こうする
+if [ -z "$ROOTPASS" ]; then
+  mysql -uroot --verbose -e "CREATE DATABASE IF NOT EXISTS ${DBNAME}" # データベースを作成
+  mysql -uroot --verbose -e "CREATE USER IF NOT EXISTS ${NORMALUSER}@'localhost' IDENTIFIED BY '${NORMALPASS}'" # 一般ユーザーを作成
+  mysql -uroot --verbose -e "GRANT DELETE, INSERT, SELECT, UPDATE ON ${DBNAME}.* TO ${NORMALUSER}@'localhost'" # 一般ユーザーに権限を付与
+  mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_access_logs.sql # 入退室ログのテーブルを作成
+  mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_in_room_users.sql # 入室中のテーブルを作成
+
+# ROOTPASSを設定した場合こうする
+else
+  mysql -uroot -p${ROOTPASS} --verbose -e "CREATE DATABASE IF NOT EXISTS ${DBNAME}" # データベースを作成
+  mysql -uroot -p${ROOTPASS} --verbose -e "CREATE USER IF NOT EXISTS ${NORMALUSER}@'localhost' IDENTIFIED BY '${NORMALPASS}'" # 一般ユーザーを作成
+  mysql -uroot -p${ROOTPASS} --verbose -e "GRANT DELETE, INSERT, SELECT, UPDATE ON ${DBNAME}.* TO ${NORMALUSER}@'localhost'" # 一般ユーザーに権限を付与
+  mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_access_logs.sql # 入退室ログのテーブルを作成
+  mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_in_room_users.sql # 入室中のテーブルを作成
+fi
 
 cp config.yml.sample config.yml # 設定ファイルを作成
 echo "設定ファイルを開きます。設定を書いてください"
@@ -85,7 +99,7 @@ pm2 start ecosystem.config.js # pm2プロセススタート
 echo "ams-backendのセットアップ終わり"
 
 echo "rdr-bridgeのセットアップ"
-cd ../rdr-bridge
+cd $HOME/ams-project/rdr-bridge
 echo "現在のディレクトリ `pwd`"
 pip3 install -r requirement.txt # 必要なライブラリのインストール
 # ここまでにはNFCカードリーダーを接続しておく
