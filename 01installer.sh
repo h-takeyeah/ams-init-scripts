@@ -24,7 +24,7 @@ read Wait
 . $HOME/.bashrc
 . $NVM_DIR/nvm.sh
 echo "nodeのインストール"
-nvm install --lts=Fermium
+nvm install --lts=Fermium --latest-npm
 echo "npmのアップデート"
 nvm install-latest-npm
 echo "pm2のインストール"
@@ -43,6 +43,7 @@ git clone --branch main https://github.com/su-its/rdr-bridge.git
 echo "ams-frontendのセットアップ"
 cd $HOME/ams-project/ams-frontend
 echo "現在のディレクトリ `pwd`"
+npm install
 cp .env_sample .env # 環境変数を設定
 pm2 start ecosystem.config.js
 echo "ams-frontendのセットアップ終わり"
@@ -50,6 +51,7 @@ echo "ams-frontendのセットアップ終わり"
 echo "ams-backendのセットアップ"
 cd $HOME/ams-project/ams-backend
 echo "現在のディレクトリ `pwd`"
+npm install
 
 echo "MariaDBのインストール"
 sudo apt update # いつもの
