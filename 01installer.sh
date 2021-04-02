@@ -121,5 +121,12 @@ pm2 save # 現在の状態を保存
 pm2 startup 2>&1 | awk '/^sudo/ {print $0}' | bash # pm2が自動起動するように設定
 echo "pm2プロセスの自動起動設定終わり"
 
+echo "chromium-browserをキオスクモードで起動する設定をしています"
+sudo cp ./open-browser.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable open-browser.service
+sudo systemctl start open-browser.service
+echo "キオスクモード設定終わり"
+
 echo "sudo reboot で再起動して動作チェックして終わり"
 echo "[Script finished] `date +%T`"

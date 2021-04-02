@@ -1,0 +1,10 @@
+[Unit]
+Description=launch chromium-browser
+
+[Service]
+User=pi
+Environment=DISPLAY=:0
+ExecStart=chromium-browser --kiosk http://localhost:3000
+
+[Install]
+WantedBy=user@.service
