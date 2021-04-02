@@ -1,10 +1,13 @@
 [Unit]
 Description=launch chromium-browser
+Requires=graphical.target
+After=graphical.target
 
 [Service]
 User=pi
+Group=pi
 Environment=DISPLAY=:0
 ExecStart=/usr/bin/chromium-browser --noerrdialogs --kiosk http://localhost:3001
 
 [Install]
-WantedBy=user@.service
+WantedBy=graphical.target
