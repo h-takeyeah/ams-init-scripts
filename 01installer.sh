@@ -23,8 +23,6 @@ read Wait
 # NVM_DIRは.bashrcでexport済みとする
 . $HOME/.bashrc
 . $NVM_DIR/nvm.sh
-echo "pm2のインストール"
-npm install -g pm2
 
 # 作業ディレクトリに移動
 mkdir -p $HOME/ams-project
@@ -71,27 +69,28 @@ read NORMALPASS
 echo "password for '${NORMALUSER}': ${NORMALPASS}"
 echo "OK"
 
-echo "データベース、ユーザーの作成などを実行しています"
+echo "データベース、ユーザー、テーブルを作成しています"
 
 # ROOTPASSを設定しなかった場合こうする
 if [ -z "$ROOTPASS" ]; then
   sudo mysql -uroot --verbose -e "CREATE DATABASE IF NOT EXISTS ${DBNAME}" # データベースを作成
   sudo mysql -uroot --verbose -e "CREATE USER IF NOT EXISTS ${NORMALUSER}@'localhost' IDENTIFIED BY '${NORMALPASS}'" # 一般ユーザーを作成
   sudo mysql -uroot --verbose -e "GRANT DELETE, INSERT, SELECT, UPDATE ON ${DBNAME}.* TO ${NORMALUSER}@'localhost'" # 一般ユーザーに権限を付与
-
+  sudo mysql -uroot ${DBNAME} --verbose < ./schema/create_table_access_logs.sql # 入退室ログのテーブルを作成
+  sudo mysql -uroot ${DBNAME} --verbose < ./schema/create_table_in_room_users.sql # 入室中のテーブルを作成
 # ROOTPASSを設定した場合こうする
 else
   sudo mysql -uroot -p${ROOTPASS} --verbose -e "CREATE DATABASE IF NOT EXISTS ${DBNAME}" # データベースを作成
   sudo mysql -uroot -p${ROOTPASS} --verbose -e "CREATE USER IF NOT EXISTS ${NORMALUSER}@'localhost' IDENTIFIED BY '${NORMALPASS}'" # 一般ユーザーを作成
   sudo mysql -uroot -p${ROOTPASS} --verbose -e "GRANT DELETE, INSERT, SELECT, UPDATE ON ${DBNAME}.* TO ${NORMALUSER}@'localhost'" # 一般ユーザーに権限を付与
+  sudo mysql -uroot -p${ROOTPASS} ${DBNAME} --verbose < ./schema/create_table_access_logs.sql # 入退室ログのテーブルを作成
+  sudo mysql -uroot -p${ROOTPASS} ${DBNAME} --verbose < ./schema/create_table_in_room_users.sql # 入室中のテーブルを作成
 fi
 
 echo "MariaDBサーバーを再起動しています"
 sudo systemctl restart mysql # サービスを再起動
 
 echo "テーブルを作成しています"
-mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_access_logs.sql # 入退室ログのテーブルを作成
-mysql -u${NORMALUSER} -p${NORMALPASS} ${DBNAME} --verbose < ./schema/create_table_in_room_users.sql # 入室中のテーブルを作成
 
 cp config.yml.sample config.yml # 設定ファイルを作成
 echo "設定ファイルを開きます。設定を書いてください"
@@ -122,7 +121,7 @@ pm2 startup 2>&1 | awk '/^sudo/ {print $0}' | bash # pm2が自動起動するよ
 echo "pm2プロセスの自動起動設定終わり"
 
 echo "chromium-browserをキオスクモードで起動する設定をしています"
-sudo cp ./open-browser.service /etc/systemd/system/
+sudo cp $HOME/ams-init-scripts/open-browser.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable open-browser.service
 sudo systemctl start open-browser.service
